@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AnimeStars Want Counter",
-  "version": "3.2",
+  "version": "3.3",
   "description": "Показывает сколько пользователей хотят получить карту",
   "icons": {
     "48": "icon.png"
@@ -9,14 +9,17 @@
   "content_scripts": [
     {
       "matches": [
+        "*://astars.club/cards/*",
         "*://astars.club/cards/pack/*",
         "*://astars.club/trades/*",
         "*://astars.club/user/*/cards/*",
         "*://astars.club/aniserials/video/*/*",
+        "*://animestars.org/cards/*",
         "*://animestars.org/cards/pack/*",
         "*://animestars.org/trades/*",
         "*://animestars.org/user/*/cards/*",
         "*://animestars.org/aniserials/video/*/*",
+        "*://asstars.tv/cards/*",
         "*://asstars.tv/cards/pack/*",
         "*://asstars.tv/trades/*",
         "*://asstars.tv/user/*/cards/*",

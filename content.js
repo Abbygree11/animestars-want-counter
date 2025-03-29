@@ -123,6 +123,7 @@ async function processCards() {
     const isTradePage = window.location.pathname.includes('/trades/');
     const isUserCardsPage = /\/user\/\w+\/cards\/?$/.test(window.location.pathname);
     const isAnimePage = /\/aniserials\/video\/\w+\/\d+-/.test(window.location.pathname);
+    const isCardsPage = /\/cards\/?(\?|$)/.test(window.location.pathname);
 
     // Находим карты в зависимости от типа страницы
     let cards;
@@ -138,6 +139,9 @@ async function processCards() {
         if (carousel) {
             cards = carousel.querySelectorAll('.anime-cards__item-wrapper .anime-cards__item');
         }
+    } else if (isCardsPage) {
+        // Для страницы со всеми картами
+        cards = document.querySelectorAll('.anime-cards__item-wrapper .anime-cards__item');
     }
 
     // Собираем ID карт
@@ -150,7 +154,7 @@ async function processCards() {
             const href = card.getAttribute('href');
             const match = href.match(/\/cards\/(\d+)/);
             cardId = match ? match[1] : null;
-        } else if (isUserCardsPage || isAnimePage) {
+        } else if (isUserCardsPage || isAnimePage || isCardsPage) {
             cardId = card.getAttribute('data-id');
         }
 
@@ -202,8 +206,9 @@ async function init() {
     const isTradePage = window.location.pathname.includes('/trades/');
     const isUserCardsPage = /\/user\/\w+\/cards\/?$/.test(window.location.pathname);
     const isAnimePage = /\/aniserials\/video\/\w+\/\d+-/.test(window.location.pathname);
+    const isCardsPage = /\/cards\/?(\?|$)/.test(window.location.pathname);
 
-    if (isPackPage || isTradePage || isUserCardsPage || isAnimePage) {
+    if (isPackPage || isTradePage || isUserCardsPage || isAnimePage || isCardsPage) {
         // Ждем полной загрузки страницы
         await waitForPageLoad();
 
