@@ -148,9 +148,8 @@ async function processCards() {
         cards = document.querySelectorAll('.trade__inventory-item[data-card-id]');
     }
 
-    // Собираем ID карт
-    const cardIds = [];
-    cards.forEach(card => {
+    // Добавляем счетчики для каждой карты по очереди
+    for (const card of cards) {
         let cardId;
         if (isPackPage) {
             cardId = card.getAttribute('data-id');
@@ -158,35 +157,36 @@ async function processCards() {
             const href = card.getAttribute('href');
             const match = href.match(/\/cards\/(\d+)/);
             cardId = match ? match[1] : null;
-        } else if (isUserCardsPage || isAnimePage || isCardsPage) {
-            cardId = card.getAttribute('data-id');
-        } else if (isTradeOfferPage){
-            cardId = card.getAttribute('data-card-id');
+        } else if (isUserCardsPage || isAnimePage || isCardsPage || isTradeOfferPage) {
+            cardId = card.getAttribute(isTradeOfferPage ? 'data-card-id' : 'data-id');
         }
 
         if (cardId) {
-            cardIds.push(cardId);
             card.dataset.cardId = cardId;
-        }
-    });
 
+            // Создаем временный счетчик с индикатором загрузки
+            const tempCounter = createCounterElement('...');
+            card.style.position = 'relative';
+            card.appendChild(tempCounter);
 
+            try {
+                // Загружаем данные для текущей карты
+                const count = await fetchCardData(cardId);
 
-    // Загружаем данные для всех карт
-    await Promise.all(cardIds.map(id => fetchCardData(id)));
+                // Заменяем временный счетчик на финальный
+                const finalCounter = createCounterElement(count);
+                card.replaceChild(finalCounter, tempCounter);
 
-    // Добавляем счетчики
-    cards.forEach(card => {
-        const cardId = card.dataset.cardId;
-        if (cardId) {
-            const count = cardsCache.get(cardId) || 0;
-            if (!card.querySelector('.card-want-counter')) {
-                const counter = createCounterElement(count);
-                card.style.position = 'relative';
-                card.appendChild(counter);
+                // Добавляем небольшую задержку между загрузками карт
+                await new Promise(resolve => setTimeout(resolve, 10));
+            } catch (error) {
+                console.error(`Ошибка при загрузке данных для карты ${cardId}:`, error);
+                // В случае ошибки оставляем временный счетчик с 0
+                const errorCounter = createCounterElement(0);
+                card.replaceChild(errorCounter, tempCounter);
             }
         }
-    });
+    }
 }
 
 // Ждем полной загрузки страницы и динамического контента
