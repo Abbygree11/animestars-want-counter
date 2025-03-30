@@ -1,6 +1,69 @@
 // Кэш для хранения данных о картах (сохраняется между обновлениями страницы)
 const cardsCache = new Map();
 
+// Функция для создания кнопки загрузки
+function createLoadButton() {
+    const button = document.createElement('div');
+    button.id = 'load-counters-btn';
+    button.title = 'Загрузить счетчики желающих';
+
+    Object.assign(button.style, {
+        position: 'fixed',
+        top: '20px',
+        right: '20px',
+        width: '40px',
+        height: '40px',
+        backgroundColor: '#772ce8',
+        borderRadius: '25%',
+        cursor: 'pointer',
+        zIndex: '9999',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxShadow: '0 2px 10px rgba(0,0,0,0.3)',
+        backgroundImage: `url(${chrome.runtime.getURL('icon.png')})`,
+        backgroundSize: '100%',
+        backgroundRepeat: 'no-repeat',
+        backgroundPosition: 'center',
+        transition: 'all 0.3s ease'
+    });
+
+    // Функция для отключения кнопки
+    const disableButton = () => {
+        button.style.opacity = '0.5';
+        button.style.cursor = 'not-allowed';
+        button.style.pointerEvents = 'none';
+        button.title = 'Идёт загрузка...';
+    };
+
+    // Функция для включения кнопки
+    const enableButton = () => {
+        button.style.opacity = '1';
+        button.style.cursor = 'pointer';
+        button.style.pointerEvents = 'auto';
+        button.title = 'Загрузить счетчики желающих';
+    };
+
+    // Эффекты при наведении (только когда кнопка активна)
+    button.addEventListener('mouseenter', () => {
+        if (button.style.pointerEvents !== 'none') {
+            button.style.transform = 'scale(1.1)';
+            button.style.boxShadow = '0 4px 15px rgba(0,0,0,0.4)';
+        }
+    });
+
+    button.addEventListener('mouseleave', () => {
+        button.style.transform = 'scale(1)';
+        button.style.boxShadow = '0 2px 10px rgba(0,0,0,0.3)';
+    });
+
+    // Сохраняем ссылки на функции в самой кнопке для доступа извне
+    button.disable = disableButton;
+    button.enable = enableButton;
+
+    return button;
+}
+
 // Функция для определения цвета кружка
 function getCounterColor(count) {
     if (count === 0) return '#cccccc';
@@ -122,70 +185,92 @@ async function processCards() {
     const isPackPage = window.location.pathname.includes('/cards/pack');
     const isTradePage = window.location.pathname.includes('/trades/');
     const isUserCardsPage = /\/user\/\w+\/cards\/?$/.test(window.location.pathname);
+    const isUserCardsSubpagePage = /\/user\/\w+\/cards\/page\/\d+\/?$/.test(window.location.pathname);
     const isAnimePage = /\/aniserials\/video\/\w+\/\d+-/.test(window.location.pathname);
-    const isCardsPage = /\/cards\/?(\?|$)/.test(window.location.pathname);
+    const isCardsLibraryPage = /\/cards\/?(\?|$)/.test(window.location.pathname);
+    const isCardsLibrarySubpagePage = /\/cards\/page\/\d+\/?(\?|$)/.test(window.location.pathname);
     const isTradeOfferPage = /\/cards\/\d+\/trade\/?$/.test(window.location.pathname);
+    let timeout = 10
 
-    // Находим карты в зависимости от типа страницы
-    let cards;
-    if (isPackPage) {
-        cards = document.querySelectorAll('.lootbox__card[data-id]');
-    } else if (isTradePage) {
-        cards = document.querySelectorAll('.trade__main-item[href*="/cards/"]');
-    } else if (isUserCardsPage) {
-        cards = document.querySelectorAll('.anime-cards__item-wrapper .anime-cards__item');
-    } else if (isAnimePage) {
-        // Для страниц аниме ищем карточки в карусели
-        const carousel = document.querySelector('.sect.pmovie__related.sbox.fixidtab.cards-carousel');
-        if (carousel) {
-            cards = carousel.querySelectorAll('.anime-cards__item-wrapper .anime-cards__item');
-        }
-    } else if (isCardsPage) {
-        // Для страницы со всеми картами
-        cards = document.querySelectorAll('.anime-cards__item-wrapper .anime-cards__item');
-    } else if (isTradeOfferPage) {
-        // Для страницы предложения обмена
-        cards = document.querySelectorAll('.trade__inventory-item[data-card-id]');
-    }
+    // Удаляем старые счетчики перед новой загрузкой
+    document.querySelectorAll('.card-want-counter').forEach(counter => {
+        counter.remove();
+    });
 
-    // Добавляем счетчики для каждой карты по очереди
-    for (const card of cards) {
-        let cardId;
+    // Очищаем кэш для принудительной перезагрузки
+    cardsCache.clear();
+
+    try {
+        // Делаем кнопку неактивной в начале загрузки
+        const loadButton = document.getElementById('load-counters-btn');
+        if (loadButton) loadButton.disable();
+
+        // Находим карты в зависимости от типа страницы
+        let cards;
         if (isPackPage) {
-            cardId = card.getAttribute('data-id');
+            cards = document.querySelectorAll('.lootbox__card[data-id]');
         } else if (isTradePage) {
-            const href = card.getAttribute('href');
-            const match = href.match(/\/cards\/(\d+)/);
-            cardId = match ? match[1] : null;
-        } else if (isUserCardsPage || isAnimePage || isCardsPage || isTradeOfferPage) {
-            cardId = card.getAttribute(isTradeOfferPage ? 'data-card-id' : 'data-id');
+            cards = document.querySelectorAll('.trade__main-item[href*="/cards/"]');
+        } else if (isUserCardsPage || isUserCardsSubpagePage) {
+            cards = document.querySelectorAll('.anime-cards__item-wrapper .anime-cards__item');
+        } else if (isAnimePage) {
+            timeout = 400
+            // Для страниц аниме ищем карточки в карусели
+            const carousel = document.querySelector('.sect.pmovie__related.sbox.fixidtab.cards-carousel');
+            if (carousel) {
+                cards = carousel.querySelectorAll('.anime-cards__item-wrapper .anime-cards__item');
+            }
+        } else if (isCardsLibraryPage || isCardsLibrarySubpagePage) {
+            // Для страницы со всеми картами
+            cards = document.querySelectorAll('.anime-cards__item-wrapper .anime-cards__item');
+        } else if (isTradeOfferPage) {
+            // Для страницы предложения обмена
+            cards = document.querySelectorAll('.trade__inventory-item[data-card-id]');
         }
+        // Добавляем счетчики для каждой карты по очереди
+        for (const card of cards) {
+            let cardId;
+            if (isPackPage) {
+                cardId = card.getAttribute('data-id');
+            } else if (isTradePage) {
+                const href = card.getAttribute('href');
+                const match = href.match(/\/cards\/(\d+)/);
+                cardId = match ? match[1] : null;
+            } else if (isUserCardsPage || isUserCardsSubpagePage || isAnimePage || isCardsLibraryPage || isCardsLibrarySubpagePage || isTradeOfferPage) {
+                cardId = card.getAttribute(isTradeOfferPage ? 'data-card-id' : 'data-id');
+            }
 
-        if (cardId) {
-            card.dataset.cardId = cardId;
+            if (cardId) {
+                card.dataset.cardId = cardId;
 
-            // Создаем временный счетчик с индикатором загрузки
-            const tempCounter = createCounterElement('...');
-            card.style.position = 'relative';
-            card.appendChild(tempCounter);
+                // Создаем временный счетчик с индикатором загрузки
+                const tempCounter = createCounterElement('...');
+                card.style.position = 'relative';
+                card.appendChild(tempCounter);
 
-            try {
-                // Загружаем данные для текущей карты
-                const count = await fetchCardData(cardId);
+                try {
+                    // Загружаем данные для текущей карты
+                    const count = await fetchCardData(cardId);
 
-                // Заменяем временный счетчик на финальный
-                const finalCounter = createCounterElement(count);
-                card.replaceChild(finalCounter, tempCounter);
+                    // Заменяем временный счетчик на финальный
+                    const finalCounter = createCounterElement(count);
+                    card.replaceChild(finalCounter, tempCounter);
 
-                // Добавляем небольшую задержку между загрузками карт
-                await new Promise(resolve => setTimeout(resolve, 10));
-            } catch (error) {
-                console.error(`Ошибка при загрузке данных для карты ${cardId}:`, error);
-                // В случае ошибки оставляем временный счетчик с 0
-                const errorCounter = createCounterElement(0);
-                card.replaceChild(errorCounter, tempCounter);
+                    // Добавляем небольшую задержку между загрузками карт
+                    await new Promise(resolve => setTimeout(resolve, timeout));
+                } catch (error) {
+                    console.error(`Ошибка при загрузке данных для карты ${cardId}:`, error);
+                    // В случае ошибки оставляем временный счетчик с 0
+                    const errorCounter = createCounterElement(0);
+                    card.replaceChild(errorCounter, tempCounter);
+                }
             }
         }
+
+    } finally {
+        // Всегда включаем кнопку обратно, даже если была ошибка
+        const loadButton = document.getElementById('load-counters-btn');
+        if (loadButton) loadButton.enable();
     }
 }
 
@@ -203,7 +288,7 @@ async function waitForPageLoad() {
             // Дополнительная задержка для динамического контента
             await new Promise(resolve => setTimeout(resolve, 1000));
             resolve(true);
-        }, { once: true });
+        }, {once: true});
     });
 }
 
@@ -213,19 +298,39 @@ async function init() {
     const isPackPage = window.location.pathname.includes('/cards/pack');
     const isTradePage = window.location.pathname.includes('/trades/');
     const isUserCardsPage = /\/user\/\w+\/cards\/?$/.test(window.location.pathname);
+    const isUserCardsSubpagePage = /\/user\/\w+\/cards\/page\/\d+\/?$/.test(window.location.pathname);
     const isAnimePage = /\/aniserials\/video\/\w+\/\d+-/.test(window.location.pathname);
-    const isCardsPage = /\/cards\/?(\?|$)/.test(window.location.pathname);
+    const isCardsLibraryPage = /\/cards\/?(\?|$)/.test(window.location.pathname);
+    const isCardsLibrarySubpagePage = /\/cards\/page\/\d+\/?(\?|$)/.test(window.location.pathname);
     const isTradeOfferPage = /\/cards\/\d+\/trade\/?$/.test(window.location.pathname);
 
-    if (isPackPage || isTradePage || isUserCardsPage || isAnimePage || isCardsPage || isTradeOfferPage) {
-        // Ждем полной загрузки страницы
+    if (isPackPage || isTradePage || isUserCardsPage || isUserCardsSubpagePage || isAnimePage || isCardsLibraryPage || isCardsLibrarySubpagePage || isTradeOfferPage) {
         await waitForPageLoad();
 
-        // Обрабатываем карты
-        await processCards();
+        const loadButton = createLoadButton();
+        document.body.appendChild(loadButton);
+
+        loadButton.addEventListener('click', async () => {
+            loadButton.disable(); // Делаем кнопку неактивной
+            await processCards();
+            loadButton.enable(); // Включаем кнопку обратно
+        });
 
         // Для динамически подгружаемых карт
-        new MutationObserver(processCards).observe(document.body, {
+        new MutationObserver((mutations) => {
+            // Проверяем, что кнопка еще не скрыта (загрузка не начата)
+            if (document.getElementById('load-counters-btn')?.style.display !== 'none') {
+                // Пересоздаем кнопку, если она была удалена
+                if (!document.getElementById('load-counters-btn')) {
+                    const newButton = createLoadButton();
+                    document.body.appendChild(newButton);
+                    newButton.addEventListener('click', async () => {
+                        newButton.style.display = 'none';
+                        await processCards();
+                    });
+                }
+            }
+        }).observe(document.body, {
             childList: true,
             subtree: true
         });
