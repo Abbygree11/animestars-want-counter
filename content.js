@@ -180,16 +180,42 @@ async function fetchCardData(cardId) {
 }
 
 // Обрабатываем карты на странице
-async function processCards() {
+async function processCardsAuto() {
     // Определяем тип страницы
-    const isPackPage = window.location.pathname.includes('/cards/pack');
-    const isTradePage = window.location.pathname.includes('/trades/');
-    const isUserCardsPage = /\/user\/\w+\/cards\/?$/.test(window.location.pathname);
-    const isUserCardsSubpagePage = /\/user\/\w+\/cards\/page\/\d+\/?$/.test(window.location.pathname);
-    const isAnimePage = /\/aniserials\/video\/\w+\/\d+-/.test(window.location.pathname);
-    const isCardsLibraryPage = /\/cards\/?(\?|$)/.test(window.location.pathname);
-    const isCardsLibrarySubpagePage = /\/cards\/page\/\d+\/?(\?|$)/.test(window.location.pathname);
-    const isTradeOfferPage = /\/cards\/\d+\/trade\/?$/.test(window.location.pathname);
+    const [isPackPage, isTradePage] = isAutoPages()
+    let timeout = 10
+
+    let cards;
+    if (isPackPage) {
+        cards = document.querySelectorAll('.lootbox__card[data-id]');
+    } else if (isTradePage) {
+        cards = document.querySelectorAll('.trade__main-item[href*="/cards/"]');
+    }
+
+    // Добавляем счетчики для каждой карты по очереди
+    for (const card of cards) {
+        console.log("handle card starts")
+        let cardId;
+        if (isPackPage) {
+            cardId = card.getAttribute('data-id');
+            console.log("handle isPackPage card ends")
+        } else if (isTradePage) {
+            const href = card.getAttribute('href');
+            const match = href.match(/\/cards\/(\d+)/);
+            cardId = match ? match[1] : null;
+            console.log("handle isTradePage card ends")
+        }
+
+        console.log("handle card " + card.id + "counter set starts")
+        await setCounter(card, cardId, timeout);
+        console.log("handle card " + card.id + "counter set ends")
+    }
+}
+
+
+async function processCardsButton() {
+    // Определяем тип страницы
+    const [isUserCardsPage, isUserCardsSubpagePage, isAnimePage, isCardsLibraryPage, isCardsLibrarySubpagePage, isTradeOfferPage] = isButtonPages()
     let timeout = 10
 
     // Удаляем старые счетчики перед новой загрузкой
@@ -207,11 +233,7 @@ async function processCards() {
 
         // Находим карты в зависимости от типа страницы
         let cards;
-        if (isPackPage) {
-            cards = document.querySelectorAll('.lootbox__card[data-id]');
-        } else if (isTradePage) {
-            cards = document.querySelectorAll('.trade__main-item[href*="/cards/"]');
-        } else if (isUserCardsPage || isUserCardsSubpagePage) {
+        if (isUserCardsPage || isUserCardsSubpagePage) {
             cards = document.querySelectorAll('.anime-cards__item-wrapper .anime-cards__item');
         } else if (isAnimePage) {
             timeout = 400
@@ -230,41 +252,11 @@ async function processCards() {
         // Добавляем счетчики для каждой карты по очереди
         for (const card of cards) {
             let cardId;
-            if (isPackPage) {
-                cardId = card.getAttribute('data-id');
-            } else if (isTradePage) {
-                const href = card.getAttribute('href');
-                const match = href.match(/\/cards\/(\d+)/);
-                cardId = match ? match[1] : null;
-            } else if (isUserCardsPage || isUserCardsSubpagePage || isAnimePage || isCardsLibraryPage || isCardsLibrarySubpagePage || isTradeOfferPage) {
+            if (isUserCardsPage || isUserCardsSubpagePage || isAnimePage || isCardsLibraryPage || isCardsLibrarySubpagePage || isTradeOfferPage) {
                 cardId = card.getAttribute(isTradeOfferPage ? 'data-card-id' : 'data-id');
             }
 
-            if (cardId) {
-                card.dataset.cardId = cardId;
-
-                // Создаем временный счетчик с индикатором загрузки
-                const tempCounter = createCounterElement('...');
-                card.style.position = 'relative';
-                card.appendChild(tempCounter);
-
-                try {
-                    // Загружаем данные для текущей карты
-                    const count = await fetchCardData(cardId);
-
-                    // Заменяем временный счетчик на финальный
-                    const finalCounter = createCounterElement(count);
-                    card.replaceChild(finalCounter, tempCounter);
-
-                    // Добавляем небольшую задержку между загрузками карт
-                    await new Promise(resolve => setTimeout(resolve, timeout));
-                } catch (error) {
-                    console.error(`Ошибка при загрузке данных для карты ${cardId}:`, error);
-                    // В случае ошибки оставляем временный счетчик с 0
-                    const errorCounter = createCounterElement(0);
-                    card.replaceChild(errorCounter, tempCounter);
-                }
-            }
+            await setCounter(card, cardId, timeout);
         }
 
     } finally {
@@ -274,37 +266,89 @@ async function processCards() {
     }
 }
 
+async function setCounter(card, cardId, timeout){
+    if (cardId) {
+        card.dataset.cardId = cardId;
+
+        // Создаем временный счетчик с индикатором загрузки
+        const tempCounter = createCounterElement('...');
+        card.style.position = 'relative';
+        card.appendChild(tempCounter);
+
+        try {
+            // Загружаем данные для текущей карты
+            const count = await fetchCardData(cardId);
+
+            // Заменяем временный счетчик на финальный
+            const finalCounter = createCounterElement(count);
+            card.replaceChild(finalCounter, tempCounter);
+
+            // Добавляем небольшую задержку между загрузками карт
+            await new Promise(resolve => setTimeout(resolve, timeout));
+        } catch (error) {
+            console.error(`Ошибка при загрузке данных для карты ${cardId}:`, error);
+            // В случае ошибки оставляем временный счетчик с 0
+            const errorCounter = createCounterElement(0);
+            card.replaceChild(errorCounter, tempCounter);
+        }
+    }
+}
+
 // Ждем полной загрузки страницы и динамического контента
 async function waitForPageLoad() {
     // Проверяем, что страница полностью загружена
     if (document.readyState === 'complete') {
         // Дополнительная задержка для динамического контента
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await sleep(1000);
         return true;
     }
+    console.log("document.readyState === 'complete'");
 
     return new Promise(resolve => {
         window.addEventListener('load', async () => {
             // Дополнительная задержка для динамического контента
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await sleep(1000);
             resolve(true);
         }, {once: true});
+        console.log("Promise(resolve => ");
     });
 }
 
 // Запускаем при загрузке страницы
 async function init() {
     // Проверяем, что мы на нужной странице
-    const isPackPage = window.location.pathname.includes('/cards/pack');
-    const isTradePage = window.location.pathname.includes('/trades/');
-    const isUserCardsPage = /\/user\/\w+\/cards\/?$/.test(window.location.pathname);
-    const isUserCardsSubpagePage = /\/user\/\w+\/cards\/page\/\d+\/?$/.test(window.location.pathname);
-    const isAnimePage = /\/aniserials\/video\/\w+\/\d+-/.test(window.location.pathname);
-    const isCardsLibraryPage = /\/cards\/?(\?|$)/.test(window.location.pathname);
-    const isCardsLibrarySubpagePage = /\/cards\/page\/\d+\/?(\?|$)/.test(window.location.pathname);
-    const isTradeOfferPage = /\/cards\/\d+\/trade\/?$/.test(window.location.pathname);
+    const [isPackPage, isTradePage] = isAutoPages()
+    const [isUserCardsPage, isUserCardsSubpagePage, isAnimePage, isCardsLibraryPage, isCardsLibrarySubpagePage, isTradeOfferPage] = isButtonPages()
 
-    if (isPackPage || isTradePage || isUserCardsPage || isUserCardsSubpagePage || isAnimePage || isCardsLibraryPage || isCardsLibrarySubpagePage || isTradeOfferPage) {
+    console.log("page handle starts");
+    if (isPackPage || isTradePage) {
+        // Ждем полной загрузки страницы
+        await waitForPageLoad();
+        console.log("waitForPageLoad done");
+
+        // Обрабатываем карты
+        await processCardsAuto();
+        console.log("processCardsAuto done");
+
+        if (isPackPage){
+            // Для динамически подгружаемых карт
+            new MutationObserver((mutations) => {
+                // Игнорируем изменения, если они содержат только счетчики
+                const hasNonCounterChanges = mutations.some(mutation => {
+                    return !mutation.addedNodes || Array.from(mutation.addedNodes).some(node =>
+                        !node.classList?.contains('card-want-counter')
+                    );
+                });
+                if (hasNonCounterChanges) {
+                    processCardsAuto();
+                }
+            }).observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        }
+        console.log("MutationObserver.observe done");
+    } else if (isUserCardsPage || isUserCardsSubpagePage || isAnimePage || isCardsLibraryPage || isCardsLibrarySubpagePage || isTradeOfferPage) {
         await waitForPageLoad();
 
         const loadButton = createLoadButton();
@@ -312,7 +356,7 @@ async function init() {
 
         loadButton.addEventListener('click', async () => {
             loadButton.disable(); // Делаем кнопку неактивной
-            await processCards();
+            await processCardsButton();
             loadButton.enable(); // Включаем кнопку обратно
         });
 
@@ -326,7 +370,7 @@ async function init() {
                     document.body.appendChild(newButton);
                     newButton.addEventListener('click', async () => {
                         newButton.style.display = 'none';
-                        await processCards();
+                        await processCardsButton();
                     });
                 }
             }
@@ -335,6 +379,32 @@ async function init() {
             subtree: true
         });
     }
+
+    console.log("page handle ends");
+
+    console.log(cardsCache)
+}
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function isButtonPages() {
+    let isUserCardsPage = /\/user\/\w+\/cards\/?$/.test(window.location.pathname);
+    let isUserCardsSubpagePage = /\/user\/\w+\/cards\/page\/\d+\/?$/.test(window.location.pathname);
+    let isAnimePage = /\/aniserials\/video\/\w+\/\d+-/.test(window.location.pathname);
+    let isCardsLibraryPage = /\/cards\/?(\?|$)/.test(window.location.pathname);
+    let isCardsLibrarySubpagePage = /\/cards\/page\/\d+\/?(\?|$)/.test(window.location.pathname);
+    let isTradeOfferPage = /\/cards\/\d+\/trade\/?$/.test(window.location.pathname);
+
+    return [isUserCardsPage, isUserCardsSubpagePage, isAnimePage, isCardsLibraryPage, isCardsLibrarySubpagePage, isTradeOfferPage]
+}
+
+function isAutoPages() {
+    const isPackPage = window.location.pathname.includes('/cards/pack');
+    const isTradePage = window.location.pathname.includes('/trades/');
+
+    return [isPackPage, isTradePage]
 }
 
 // Запускаем расширение
