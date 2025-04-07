@@ -1,11 +1,14 @@
 // Кэш для хранения данных о картах (сохраняется между обновлениями страницы)
 const cardsCache = new Map();
 
+const lockCardBorder = '6px solid #fc363b';
+const unlockCardBorder = '6px solid #4CAF50';
+
 // Запускаем при загрузке страницы
 async function init() {
     // Проверяем, что мы на нужной странице
     const [isPackPage, isTradePage] = isAutoPages()
-    const [isUserCardsPage, isUserCardsSubpagePage, isAnimePage, isCardsLibraryPage, isCardsLibrarySubpagePage, isTradeOfferPage] = isButtonPages()
+    const [isUserCardsPage, isUserCardsSubpagePage, isAnimePage, isCardsLibraryPage, isCardsLibrarySubpagePage, isTradeOfferPage, isUserNeedPage, isUserNeedSubpagePage] = isButtonPages()
 
     // Универсальный наблюдатель для модальных окон
     const modalObserver = new MutationObserver((mutations) => {
@@ -25,15 +28,12 @@ async function init() {
         subtree: true
     });
 
-    console.log("page handle starts");
     if (isPackPage || isTradePage) {
         // Ждем полной загрузки страницы
         await waitForPageLoad();
-        console.log("waitForPageLoad done");
 
         // Обрабатываем карты
         await processCardsAuto();
-        console.log("processCardsAuto done");
 
         if (isPackPage) {
             // Для динамически подгружаемых карт
@@ -52,8 +52,14 @@ async function init() {
                 subtree: true
             });
         }
-        console.log("MutationObserver.observe done");
-    } else if (isUserCardsPage || isUserCardsSubpagePage || isAnimePage || isCardsLibraryPage || isCardsLibrarySubpagePage || isTradeOfferPage) {
+    } else if (isUserCardsPage ||
+        isUserCardsSubpagePage ||
+        isAnimePage ||
+        isCardsLibraryPage ||
+        isCardsLibrarySubpagePage ||
+        isTradeOfferPage ||
+        isUserNeedPage ||
+        isUserNeedSubpagePage) {
         await waitForPageLoad();
 
         const loadButton = createLoadButton();
@@ -84,10 +90,6 @@ async function init() {
             subtree: true
         });
     }
-
-    console.log("page handle ends");
-
-    console.log(cardsCache)
 }
 
 // Обрабатываем карты на странице
@@ -105,15 +107,13 @@ async function processCardsAuto() {
 
     // Добавляем счетчики для каждой карты по очереди
     for (const card of cards) {
-        console.log("handle card starts")
         let cardId;
         if (isPackPage) {
             cardId = card.getAttribute('data-id');
-            console.log("handle isPackPage card ends")
 
             // Добавляем кнопку выбора только на странице пакета
             if (!card.querySelector('.choose-card-btn')) {
-                const chooseButton = createChooseAndLockButton(card);
+                const chooseButton = createLockButton(card);
                 card.style.position = 'relative';
                 card.appendChild(chooseButton);
             }
@@ -121,19 +121,16 @@ async function processCardsAuto() {
             const href = card.getAttribute('href');
             const match = href.match(/\/cards\/(\d+)/);
             cardId = match ? match[1] : null;
-            console.log("handle isTradePage card ends")
         }
 
-        console.log("handle card " + card.id + "counter set starts")
         await setCounter(card, cardId, timeout);
-        console.log("handle card " + card.id + "counter set ends")
     }
 }
 
 
 async function processCardsButton() {
     // Определяем тип страницы
-    const [isUserCardsPage, isUserCardsSubpagePage, isAnimePage, isCardsLibraryPage, isCardsLibrarySubpagePage, isTradeOfferPage] = isButtonPages()
+    const [isUserCardsPage, isUserCardsSubpagePage, isAnimePage, isCardsLibraryPage, isCardsLibrarySubpagePage, isTradeOfferPage, isUserNeedPage, isUserNeedSubpagePage] = isButtonPages()
     let timeout = 10
 
     // Удаляем старые счетчики перед новой загрузкой
@@ -152,7 +149,12 @@ async function processCardsButton() {
         // Находим карты в зависимости от типа страницы
         /** @type {Element[]} */
         let cards;
-        if (isUserCardsPage || isUserCardsSubpagePage) {
+        if (isUserCardsPage ||
+            isUserCardsSubpagePage ||
+            isUserNeedPage ||
+            isUserNeedSubpagePage ||
+            isCardsLibraryPage ||
+            isCardsLibrarySubpagePage) {
             cards = Array.from(document.querySelectorAll('.anime-cards__item-wrapper .anime-cards__item'));
         } else if (isAnimePage) {
             timeout = 400
@@ -161,9 +163,6 @@ async function processCardsButton() {
             if (carousel) {
                 cards = Array.from(carousel.querySelectorAll('.anime-cards__item-wrapper .anime-cards__item'));
             }
-        } else if (isCardsLibraryPage || isCardsLibrarySubpagePage) {
-            // Для страницы со всеми картами
-            cards = Array.from(document.querySelectorAll('.anime-cards__item-wrapper .anime-cards__item'));
         } else if (isTradeOfferPage) {
             // Для страницы предложения обмена
             const cards1 = document.querySelectorAll('.trade__inventory-item[data-card-id]');
@@ -174,7 +173,13 @@ async function processCardsButton() {
         // Добавляем счетчики для каждой карты по очереди
         for (const card of cards) {
             let cardId;
-            if (isUserCardsPage || isUserCardsSubpagePage || isAnimePage || isCardsLibraryPage || isCardsLibrarySubpagePage) {
+            if (isUserCardsPage ||
+                isUserCardsSubpagePage ||
+                isAnimePage ||
+                isCardsLibraryPage ||
+                isCardsLibrarySubpagePage ||
+                isUserNeedPage ||
+                isUserNeedSubpagePage) {
                 cardId = card.getAttribute('data-id');
             } else if (isTradeOfferPage) {
                 cardId = card.getAttribute('data-card-id');
@@ -186,6 +191,10 @@ async function processCardsButton() {
             }
 
             await setCounter(card, cardId, timeout);
+
+            if (isUserCardsPage || isUserCardsSubpagePage) {
+                await addLockButtonAndBorder(card)
+            }
         }
 
     } finally {
@@ -215,12 +224,9 @@ async function processModalCards() {
 // Функция для обработки выбора карты
 async function handleCardSelection(cardElement) {
     const cardId = cardElement.getAttribute('data-id');
-    console.log('cardId - '+cardId);
     const packRow = document.querySelector('.lootbox__row');
     const packId = packRow?.getAttribute('data-pack-id');
-    console.log('packId - '+packId);
     const userHash = getDleLoginHash();
-    console.log('userHash - '+userHash);
     const baseUrl = getBaseUrl();
 
     if (!cardId || !packId || !userHash) {
@@ -352,8 +358,10 @@ function isButtonPages() {
     let isCardsLibraryPage = /\/cards\/?(\?|$)/.test(window.location.pathname);
     let isCardsLibrarySubpagePage = /\/cards\/page\/\d+\/?(\?|$)/.test(window.location.pathname);
     let isTradeOfferPage = /\/cards\/\d+\/trade\/?$/.test(window.location.pathname);
+    let isUserNeedPage = /\/user\/\w+\/cards\/need\/?$/.test(window.location.pathname);
+    let isUserNeedSubpagePage = /\/user\/\w+\/cards\/need\/page\/\d+\/?$/.test(window.location.pathname);
 
-    return [isUserCardsPage, isUserCardsSubpagePage, isAnimePage, isCardsLibraryPage, isCardsLibrarySubpagePage, isTradeOfferPage]
+    return [isUserCardsPage, isUserCardsSubpagePage, isAnimePage, isCardsLibraryPage, isCardsLibrarySubpagePage, isTradeOfferPage, isUserNeedPage, isUserNeedSubpagePage]
 }
 
 function isAutoPages() {
@@ -440,14 +448,12 @@ async function fetchCardData(cardId) {
 
 // Ждем полной загрузки страницы и динамического контента
 async function waitForPageLoad() {
-    console.log(document.readyState);
     // Проверяем, что страница полностью загружена
     if (document.readyState === 'complete') {
         // Дополнительная задержка для динамического контента
         await sleep(1000);
         return true;
     }
-    console.log("document.readyState === 'complete'");
 
     return new Promise(resolve => {
         window.addEventListener('load', async () => {
@@ -455,14 +461,67 @@ async function waitForPageLoad() {
             await sleep(1000);
             resolve(true);
         }, {once: true});
-        console.log("Promise(resolve => ");
     });
+}
+
+async function toggleCardLock(button, card) {
+    const userHash = getDleLoginHash();
+    const baseUrl = getBaseUrl();
+    const isCurrentlyLocked = button.querySelector('.fa-lock');
+    const ownerId = card.getAttribute('data-owner-id');
+
+    try {
+        const formData = new FormData();
+        formData.append('action', 'lock_card');
+        formData.append('id', ownerId);
+        formData.append('user_hash', userHash);
+
+        await fetch(`${baseUrl}/engine/ajax/controller.php?mod=cards_ajax`, {
+            method: 'POST',
+            body: formData
+        });
+
+        // Обновляем UI после успешного запроса
+        const card = button.closest('.anime-cards__item');
+        if (isCurrentlyLocked) {
+            // Разблокировали карту
+            button.innerHTML = '<span class="fal fa-unlock"></span>';
+            button.style.backgroundColor = '#fc363b';
+            button.title = 'Разблокировать карту';
+            card.style.border = unlockCardBorder;
+
+            // Обновляем оригинальную кнопку блокировки
+            const originalLockBtn = card.querySelector('.lock-card-btn .fal');
+            if (originalLockBtn) {
+                originalLockBtn.classList.remove('fa-lock');
+                originalLockBtn.classList.add('fa-unlock');
+            }
+        } else {
+            // Заблокировали карту
+            button.innerHTML = '<span class="fal fa-lock"></span>';
+            button.style.backgroundColor = '#4CAF50';
+            button.title = 'Заблокировать карту';
+            card.style.border = lockCardBorder;
+
+            // Обновляем оригинальную кнопку блокировки
+            const originalLockBtn = card.querySelector('.lock-card-btn .fal');
+            if (originalLockBtn) {
+                originalLockBtn.classList.remove('fa-unlock');
+                originalLockBtn.classList.add('fa-lock');
+            }
+        }
+    } catch (error) {
+        console.error('Ошибка при изменении статуса блокировки:', error);
+    }
 }
 
 //-------------------------------------------------------------------------------------------------------------------------------------------
 // PageElements
 // Функция для создания кнопки выбора карты
-function createChooseAndLockButton(cardElement) {
+function createLockButton(cardElement) {
+    const [isPackPage, isTradePage] = isAutoPages()
+    const [isUserCardsPage, isUserCardsSubpagePage, isAnimePage, isCardsLibraryPage, isCardsLibrarySubpagePage, isTradeOfferPage, isUserNeedPage, isUserNeedSubpagePage] = isButtonPages()
+
     const button = document.createElement('div');
     button.className = 'choose-card-btn';
     button.title = 'Выбрать эту карту';
@@ -505,10 +564,35 @@ function createChooseAndLockButton(cardElement) {
     // Обработчик клика
     button.addEventListener('click', async (e) => {
         e.stopPropagation();
-        await handleCardSelection(cardElement);
+        if (isTradePage) {
+            await handleCardSelection(cardElement);
+        } else if (isUserCardsPage || isUserCardsSubpagePage) {
+            await toggleCardLock(button, cardElement);
+        }
     });
 
     return button;
+}
+
+// Добавляем в начало файла
+async function addLockButtonAndBorder(card) {
+    const lockBtn = card.querySelector('.lock-card-btn .fal');
+
+    if (lockBtn) {
+        // Добавляем окантовку в зависимости от статуса блокировки
+        if (lockBtn.classList.contains('fa-lock')) {
+            card.style.border = lockCardBorder; // Красная окантовка
+        } else if (lockBtn.classList.contains('fa-unlock')) {
+            card.style.border = unlockCardBorder; // Зеленая окантовка
+        }
+
+        // Добавляем кнопку блокировки/разблокировки
+        if (!card.querySelector('.custom-lock-btn')) {
+            const customLockBtn = createLockButton(card);
+            card.style.position = 'relative';
+            card.appendChild(customLockBtn);
+        }
+    }
 }
 
 // Функция для создания кнопки загрузки
