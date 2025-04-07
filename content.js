@@ -8,15 +8,13 @@ const unlockCardBorder = '6px solid #4CAF50';
 async function init() {
     // Проверяем, что мы на нужной странице
     const [isPackPage, isTradePage] = isAutoPages()
-    const [isUserCardsPage, isUserCardsSubpagePage, isAnimePage, isCardsLibraryPage, isCardsLibrarySubpagePage, isTradeOfferPage, isUserNeedPage, isUserNeedSubpagePage] = isButtonPages()
+    const [isUserCardsPage, isAnimePage, isCardsLibraryPage, isTradeOfferPage, isUserNeedPage, isUserTradePage] = isButtonPages()
 
     // Универсальный наблюдатель для модальных окон
     const modalObserver = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
             mutation.addedNodes.forEach((node) => {
-                if (node.nodeType === Node.ELEMENT_NODE &&
-                    node.classList?.contains('ui-dialog-content') &&
-                    node.classList?.contains('ui-widget-content')) {
+                if (node.nodeType === Node.ELEMENT_NODE && node.classList?.contains('ui-dialog-content') && node.classList?.contains('ui-widget-content')) {
                     processModalCards();
                 }
             });
@@ -24,8 +22,7 @@ async function init() {
     });
     // Начинаем наблюдение за всем документом
     modalObserver.observe(document.body, {
-        childList: true,
-        subtree: true
+        childList: true, subtree: true
     });
 
     if (isPackPage || isTradePage) {
@@ -40,26 +37,16 @@ async function init() {
             new MutationObserver((mutations) => {
                 // Игнорируем изменения, если они содержат только счетчики
                 const hasNonCounterChanges = mutations.some(mutation => {
-                    return !mutation.addedNodes || Array.from(mutation.addedNodes).some(node =>
-                        !node.classList?.contains('card-want-counter')
-                    );
+                    return !mutation.addedNodes || Array.from(mutation.addedNodes).some(node => !node.classList?.contains('card-want-counter'));
                 });
                 if (hasNonCounterChanges) {
                     processCardsAuto();
                 }
             }).observe(document.body, {
-                childList: true,
-                subtree: true
+                childList: true, subtree: true
             });
         }
-    } else if (isUserCardsPage ||
-        isUserCardsSubpagePage ||
-        isAnimePage ||
-        isCardsLibraryPage ||
-        isCardsLibrarySubpagePage ||
-        isTradeOfferPage ||
-        isUserNeedPage ||
-        isUserNeedSubpagePage) {
+    } else if (isUserCardsPage || isAnimePage || isCardsLibraryPage || isTradeOfferPage || isUserNeedPage || isUserTradePage) {
         await waitForPageLoad();
 
         const loadButton = createLoadButton();
@@ -86,8 +73,7 @@ async function init() {
                 }
             }
         }).observe(document.body, {
-            childList: true,
-            subtree: true
+            childList: true, subtree: true
         });
     }
 }
@@ -130,7 +116,7 @@ async function processCardsAuto() {
 
 async function processCardsButton() {
     // Определяем тип страницы
-    const [isUserCardsPage, isUserCardsSubpagePage, isAnimePage, isCardsLibraryPage, isCardsLibrarySubpagePage, isTradeOfferPage, isUserNeedPage, isUserNeedSubpagePage] = isButtonPages()
+    const [isUserCardsPage, isAnimePage, isCardsLibraryPage, isTradeOfferPage, isUserNeedPage, isUserTradePage] = isButtonPages()
     let timeout = 10
 
     // Удаляем старые счетчики перед новой загрузкой
@@ -149,12 +135,7 @@ async function processCardsButton() {
         // Находим карты в зависимости от типа страницы
         /** @type {Element[]} */
         let cards;
-        if (isUserCardsPage ||
-            isUserCardsSubpagePage ||
-            isUserNeedPage ||
-            isUserNeedSubpagePage ||
-            isCardsLibraryPage ||
-            isCardsLibrarySubpagePage) {
+        if (isUserCardsPage || isUserNeedPage || isCardsLibraryPage || isUserTradePage) {
             cards = Array.from(document.querySelectorAll('.anime-cards__item-wrapper .anime-cards__item'));
         } else if (isAnimePage) {
             timeout = 400
@@ -173,13 +154,7 @@ async function processCardsButton() {
         // Добавляем счетчики для каждой карты по очереди
         for (const card of cards) {
             let cardId;
-            if (isUserCardsPage ||
-                isUserCardsSubpagePage ||
-                isAnimePage ||
-                isCardsLibraryPage ||
-                isCardsLibrarySubpagePage ||
-                isUserNeedPage ||
-                isUserNeedSubpagePage) {
+            if (isUserCardsPage || isAnimePage || isCardsLibraryPage || isUserNeedPage || isUserTradePage) {
                 cardId = card.getAttribute('data-id');
             } else if (isTradeOfferPage) {
                 cardId = card.getAttribute('data-card-id');
@@ -192,7 +167,7 @@ async function processCardsButton() {
 
             await setCounter(card, cardId, timeout);
 
-            if (isUserCardsPage || isUserCardsSubpagePage) {
+            if (isUserCardsPage) {
                 await addLockButtonAndBorder(card)
             }
         }
@@ -243,8 +218,7 @@ async function handleCardSelection(cardElement) {
         chooseFormData.append('user_hash', userHash);
 
         await fetch(`${baseUrl}/engine/ajax/controller.php?mod=cards_ajax`, {
-            method: 'POST',
-            body: chooseFormData
+            method: 'POST', body: chooseFormData
         });
 
         // 2. Обновляем список карт в паке
@@ -253,8 +227,7 @@ async function handleCardSelection(cardElement) {
         loadFormData.append('user_hash', userHash);
 
         await fetch(`${baseUrl}/engine/ajax/controller.php?mod=cards_ajax`, {
-            method: 'POST',
-            body: loadFormData
+            method: 'POST', body: loadFormData
         });
 
         // 3. Получаем ник пользователя
@@ -280,8 +253,7 @@ async function handleCardSelection(cardElement) {
                 lockFormData.append('user_hash', userHash);
 
                 await fetch(`${baseUrl}/engine/ajax/controller.php?mod=cards_ajax`, {
-                    method: 'POST',
-                    body: lockFormData
+                    method: 'POST', body: lockFormData
                 });
             }
         }
@@ -352,16 +324,14 @@ function sleep(ms) {
 }
 
 function isButtonPages() {
-    let isUserCardsPage = /\/user\/\w+\/cards\/?$/.test(window.location.pathname);
-    let isUserCardsSubpagePage = /\/user\/\w+\/cards\/page\/\d+\/?$/.test(window.location.pathname);
+    let isUserCardsPage = /\/user\/\w+\/cards\/?$/.test(window.location.pathname) || /\/user\/\w+\/cards\/page\/\d+\/?$/.test(window.location.pathname);
     let isAnimePage = /\/aniserials\/video\/\w+\/\d+-/.test(window.location.pathname);
-    let isCardsLibraryPage = /\/cards\/?(\?|$)/.test(window.location.pathname);
-    let isCardsLibrarySubpagePage = /\/cards\/page\/\d+\/?(\?|$)/.test(window.location.pathname);
+    let isCardsLibraryPage = /\/cards\/?(\?|$)/.test(window.location.pathname) || /\/cards\/page\/\d+\/?(\?|$)/.test(window.location.pathname);
     let isTradeOfferPage = /\/cards\/\d+\/trade\/?$/.test(window.location.pathname);
-    let isUserNeedPage = /\/user\/\w+\/cards\/need\/?$/.test(window.location.pathname);
-    let isUserNeedSubpagePage = /\/user\/\w+\/cards\/need\/page\/\d+\/?$/.test(window.location.pathname);
+    let isUserNeedPage = /\/user\/\w+\/cards\/need\/?$/.test(window.location.pathname) || /\/user\/\w+\/cards\/need\/page\/\d+\/?$/.test(window.location.pathname);
+    let isUserTradePage = /\/user\/\w+\/cards\/trade\/?$/.test(window.location.pathname) || /\/user\/\w+\/cards\/trade\/page\/\d+\/?$/.test(window.location.pathname);
 
-    return [isUserCardsPage, isUserCardsSubpagePage, isAnimePage, isCardsLibraryPage, isCardsLibrarySubpagePage, isTradeOfferPage, isUserNeedPage, isUserNeedSubpagePage]
+    return [isUserCardsPage, isAnimePage, isCardsLibraryPage, isTradeOfferPage, isUserNeedPage, isUserTradePage]
 }
 
 function isAutoPages() {
@@ -374,11 +344,7 @@ function isAutoPages() {
 // Получаем базовый URL для запросов
 function getBaseUrl() {
     const currentOrigin = window.location.origin;
-    return currentOrigin.includes('animestars.org')
-        ? 'https://animestars.org'
-        : currentOrigin.includes('asstars.tv')
-            ? 'https://asstars.tv'
-            : 'https://astars.club';
+    return currentOrigin.includes('animestars.org') ? 'https://animestars.org' : currentOrigin.includes('asstars.tv') ? 'https://asstars.tv' : 'https://astars.club';
 }
 
 // Получаем количество страниц пагинации
@@ -421,14 +387,13 @@ async function fetchCardData(cardId) {
                 const pagePromises = [];
 
                 for (let page = 2; page <= totalPages; page++) {
-                    pagePromises.push(
-                        fetch(`${baseUrl}/cards/${cardId}/users/need/page/${page}/`)
-                            .then(response => response.text())
-                            .then(html => {
-                                const doc = parser.parseFromString(html, 'text/html');
-                                return doc.querySelectorAll('.profile__friends--full .profile__friends-item').length;
-                            })
-                            .catch(() => 0) // В случае ошибки считаем 0 пользователей на этой странице
+                    pagePromises.push(fetch(`${baseUrl}/cards/${cardId}/users/need/page/${page}/`)
+                        .then(response => response.text())
+                        .then(html => {
+                            const doc = parser.parseFromString(html, 'text/html');
+                            return doc.querySelectorAll('.profile__friends--full .profile__friends-item').length;
+                        })
+                        .catch(() => 0) // В случае ошибки считаем 0 пользователей на этой странице
                     );
                 }
 
@@ -477,8 +442,7 @@ async function toggleCardLock(button, card) {
         formData.append('user_hash', userHash);
 
         await fetch(`${baseUrl}/engine/ajax/controller.php?mod=cards_ajax`, {
-            method: 'POST',
-            body: formData
+            method: 'POST', body: formData
         });
 
         // Обновляем UI после успешного запроса
@@ -520,7 +484,7 @@ async function toggleCardLock(button, card) {
 // Функция для создания кнопки выбора карты
 function createLockButton(cardElement) {
     const [isPackPage, isTradePage] = isAutoPages()
-    const [isUserCardsPage, isUserCardsSubpagePage, isAnimePage, isCardsLibraryPage, isCardsLibrarySubpagePage, isTradeOfferPage, isUserNeedPage, isUserNeedSubpagePage] = isButtonPages()
+    const [isUserCardsPage, isAnimePage, isCardsLibraryPage, isTradeOfferPage, isUserNeedPage, isUserTradePage] = isButtonPages()
 
     const button = document.createElement('div');
     button.className = 'choose-card-btn';
@@ -566,7 +530,7 @@ function createLockButton(cardElement) {
         e.stopPropagation();
         if (isTradePage) {
             await handleCardSelection(cardElement);
-        } else if (isUserCardsPage || isUserCardsSubpagePage) {
+        } else if (isUserCardsPage) {
             await toggleCardLock(button, cardElement);
         }
     });
