@@ -528,7 +528,7 @@ function createLockButton(cardElement) {
     // Обработчик клика
     button.addEventListener('click', async (e) => {
         e.stopPropagation();
-        if (isTradePage) {
+        if (isPackPage) {
             await handleCardSelection(cardElement);
         } else if (isUserCardsPage) {
             await toggleCardLock(button, cardElement);
