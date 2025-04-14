@@ -25,6 +25,23 @@ async function init() {
         childList: true, subtree: true
     });
 
+    if (isAnimePage){
+        // Универсальный наблюдатель для модальных окон
+        const cardNotificationObserver = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                mutation.addedNodes.forEach((node) => {
+                    if (node.nodeType === Node.ELEMENT_NODE && node.classList?.contains('card-notification')) {
+                        processCardNotification();
+                    }
+                });
+            });
+        });
+        // Начинаем наблюдение за всем документом
+        cardNotificationObserver.observe(document.body, {
+            childList: true, subtree: true
+        });
+    }
+
     if (isPackPage || isTradePage) {
         // Ждем полной загрузки страницы
         await waitForPageLoad();
@@ -194,6 +211,16 @@ async function processModalCards() {
 
     const cardPlaceholder = modal.querySelector('.anime-cards__placeholder');
     await setCounter(cardPlaceholder, cardId, 10);
+}
+
+// Функция для обработки карт в модальном окне
+async function processCardNotification() {
+    const card = document.querySelector('.card-notification');
+    card.click()
+    await sleep(500);
+
+    const modal = document.querySelector('.ui-button-icon.ui-icon.ui-icon-closethick');
+    modal.click()
 }
 
 // Функция для обработки выбора карты
