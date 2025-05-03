@@ -25,7 +25,7 @@ async function init() {
         childList: true, subtree: true
     });
 
-    if (isAnimePage){
+    if (isAnimePage) {
         // Универсальный наблюдатель для модальных окон
         const cardNotificationObserver = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
@@ -54,9 +54,10 @@ async function init() {
             new MutationObserver((mutations) => {
                 // Игнорируем изменения, если они содержат только счетчики
                 const hasNonCounterChanges = mutations.some(mutation => {
-                    return !mutation.addedNodes || Array.from(mutation.addedNodes).some(node => !node.classList?.contains('card-want-counter'));
+                    return !mutation.addedNodes || Array.from(mutation.addedNodes).some(node => !node.classList?.contains('card-counters'));
                 });
                 if (hasNonCounterChanges) {
+                    console.log('processCardsAuto()');
                     processCardsAuto();
                 }
             }).observe(document.body, {
@@ -126,6 +127,7 @@ async function processCardsAuto() {
             cardId = match ? match[1] : null;
         }
 
+        console.log('setCounter()');
         await setCounter(card, cardId, timeout);
     }
 }
@@ -137,7 +139,10 @@ async function processCardsButton() {
     let timeout = 10
 
     // Удаляем старые счетчики перед новой загрузкой
-    document.querySelectorAll('.card-want-counter').forEach(counter => {
+    document.querySelectorAll('.card-need-counter').forEach(counter => {
+        counter.remove();
+    });
+    document.querySelectorAll('.card-trade-counter').forEach(counter => {
         counter.remove();
     });
 
@@ -205,7 +210,7 @@ async function processModalCards() {
     if (!card) return;
 
     // Проверяем, не добавлен ли уже счетчик
-    if (card.querySelector('.card-want-counter')) return;
+    if (card.querySelector('.card-need-counter') && card.querySelector('.card-trade-counter')) return;
 
     const cardId = card.getAttribute('data-id');
 
@@ -317,31 +322,32 @@ async function setCounter(card, cardId, timeout) {
         card.dataset.cardId = cardId;
 
         if (cardsCache.has(cardId)) {
-            const tempCounter = createCounterElement(cardsCache.get(cardId));
+            const [need, trade] = cardsCache.get(cardId)
+            const tempCounters = createCountersElement(card, need, trade);
             card.style.position = 'relative';
-            card.appendChild(tempCounter);
+            card.appendChild(tempCounters);
         }
 
         // Создаем временный счетчик с индикатором загрузки
-        const tempCounter = createCounterElement('...');
+        const tempCounters = createCountersElement(card, '...', '...');
         card.style.position = 'relative';
-        card.appendChild(tempCounter);
+        card.appendChild(tempCounters);
 
         try {
             // Загружаем данные для текущей карты
-            const count = await fetchCardData(cardId);
+            const [need, trade] = await fetchCardData(cardId);
 
             // Заменяем временный счетчик на финальный
-            const finalCounter = createCounterElement(count);
-            card.replaceChild(finalCounter, tempCounter);
+            const finalCounters = createCountersElement(card, need, trade);
+            card.replaceChild(finalCounters, tempCounters);
 
             // Добавляем небольшую задержку между загрузками карт
             await new Promise(resolve => setTimeout(resolve, timeout));
         } catch (error) {
             console.error(`Ошибка при загрузке данных для карты ${cardId}:`, error);
             // В случае ошибки оставляем временный счетчик с 0
-            const errorCounter = createCounterElement(0);
-            card.replaceChild(errorCounter, tempCounter);
+            const errorCounters = createCountersElement(card, 0, 0);
+            card.replaceChild(errorCounters, tempCounters);
         }
     }
 }
@@ -398,43 +404,21 @@ async function fetchCardData(cardId) {
         try {
             const baseUrl = getBaseUrl();
             // Сначала загружаем первую страницу
-            const firstPageResponse = await fetch(`${baseUrl}/cards/${cardId}/users/need/`);
-            const firstPageHtml = await firstPageResponse.text();
+            const cardPage = await fetch(`${baseUrl}/cards/${cardId}/users`);
+            const cardPageHtml = await cardPage.text();
             const parser = new DOMParser();
-            const firstPageDoc = parser.parseFromString(firstPageHtml, 'text/html');
+            const cardPageDoc = parser.parseFromString(cardPageHtml, 'text/html');
 
-            // Получаем общее количество страниц
-            const totalPages = getTotalPages(firstPageDoc);
+            const need = cardPageDoc.getElementById('owners-need').textContent;
+            const trade = cardPageDoc.getElementById('owners-trade').textContent;
 
-            // Считаем пользователей на первой странице
-            let totalCount = firstPageDoc.querySelectorAll('.profile__friends--full .profile__friends-item').length;
-
-            // Если есть другие страницы, загружаем их
-            if (totalPages > 1) {
-                const pagePromises = [];
-
-                for (let page = 2; page <= totalPages; page++) {
-                    pagePromises.push(fetch(`${baseUrl}/cards/${cardId}/users/need/page/${page}/`)
-                        .then(response => response.text())
-                        .then(html => {
-                            const doc = parser.parseFromString(html, 'text/html');
-                            return doc.querySelectorAll('.profile__friends--full .profile__friends-item').length;
-                        })
-                        .catch(() => 0) // В случае ошибки считаем 0 пользователей на этой странице
-                    );
-                }
-
-                // Суммируем результаты всех страниц
-                const pageCounts = await Promise.all(pagePromises);
-                totalCount += pageCounts.reduce((sum, count) => sum + count, 0);
-            }
-
-            cardsCache.set(cardId, totalCount);
+            cardsCache.set(cardId, [need, trade]);
         } catch (error) {
             console.error(`Ошибка для карты ${cardId}:`, error);
-            cardsCache.set(cardId, 0);
+            cardsCache.set(cardId, [0, 0]);
         }
     }
+
     return cardsCache.get(cardId);
 }
 
@@ -509,7 +493,7 @@ async function toggleCardLock(button, card) {
 //-------------------------------------------------------------------------------------------------------------------------------------------
 // PageElements
 // Функция для создания кнопки выбора карты
-function createLockButton(cardElement) {
+function createLockButton(card) {
     const [isPackPage, isTradePage] = isAutoPages()
     const [isUserCardsPage, isAnimePage, isCardsLibraryPage, isTradeOfferPage, isUserNeedPage, isUserTradePage] = isButtonPages()
 
@@ -517,12 +501,17 @@ function createLockButton(cardElement) {
     button.className = 'choose-card-btn';
     button.title = 'Выбрать эту карту';
 
+    const width = card.offsetWidth * (35/160);  //example - 160*(35/160)= 35
+    const diameter = width * (25/35);           //example - 35*(25/35)  = 25
+    const topShift = width * (10/35);           //example - 35*(10/35)  = 10
+    const rightShift = width * (10/35);         //example - 35*(10/35)  = 10
+
     Object.assign(button.style, {
         position: 'absolute',
-        top: '10px',
-        right: '10px',
-        width: '25px',
-        height: '25px',
+        top: topShift+'px',
+        right: rightShift+'px',
+        width: diameter+'px',
+        height: diameter+'px',
         backgroundColor: '#772ce8',
         borderRadius: '50%',
         cursor: 'pointer',
@@ -556,9 +545,9 @@ function createLockButton(cardElement) {
     button.addEventListener('click', async (e) => {
         e.stopPropagation();
         if (isPackPage) {
-            await handleCardSelection(cardElement);
+            await handleCardSelection(card);
         } else if (isUserCardsPage) {
-            await toggleCardLock(button, cardElement);
+            await toggleCardLock(button, card);
         }
     });
 
@@ -660,33 +649,69 @@ function getCounterColor(count) {
 }
 
 // Создаем счетчик
-function createCounterElement(count) {
-    const counter = document.createElement('div');
-    counter.className = 'card-want-counter';
-    counter.textContent = count;
-    counter.title = `${count} пользователей хотят эту карту`;
+function createCountersElement(card, needCount, tradeCount) {
+    const width = card.offsetWidth * (35/160)   //example - 160*(35/160)= 35
+    const height = width * (25/35)              //example - 35*(25/35)  = 25
+    const fontSize = width * (12/35)            //example - 35*(12/35)  = 12
+    const xAxisShift = (width / 2) + 1          //example - 35/2 + 1    = 21
+    const topShift = width * (10/35);           //example - 35*(10/35)  = 10
 
-    Object.assign(counter.style, {
+    const counters = document.createElement('div');
+    counters.className = 'card-counters';
+
+    const needCounter = document.createElement('div');
+    needCounter.className = 'card-need-counter';
+    needCounter.textContent = 'N:' + needCount;
+    needCounter.title = `${needCount} пользователей хотят эту карту`;
+
+    Object.assign(needCounter.style, {
         position: 'absolute',
-        top: '10px',
+        top: topShift+'px',
         left: '50%',
-        transform: 'translateX(-50%)',
-        backgroundColor: getCounterColor(count),
-        color: count > 50 ? '#000' : '#fff',
-        borderRadius: '50%',
-        width: '25px',
-        height: '25px',
+        transform: 'translateX(calc(-50% - '+ xAxisShift +'px))',
+        backgroundColor: getCounterColor(needCount),
+        color: needCount > 50 ? '#000' : '#fff',
+        borderRadius: '35%',
+        width: width+'px',
+        height: height+'px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontSize: '12px',
+        fontSize: fontSize+'px',
         fontWeight: 'bold',
         zIndex: '10',
         boxShadow: '0 2px 5px rgba(0,0,0,0.3)',
-        border: count === 0 ? '1px solid #999' : 'none'
+        border: needCount === 0 ? '1px solid #999' : 'none'
     });
+    counters.appendChild(needCounter);
 
-    return counter;
+    const tradeCounter = document.createElement('div');
+    tradeCounter.className = 'card-trade-counter';
+    tradeCounter.textContent = 'T:' + tradeCount;
+    tradeCounter.title = `${tradeCount} пользователей не хотят эту карту`;
+
+    Object.assign(tradeCounter.style, {
+        position: 'absolute',
+        top: topShift+'px',
+        left: '50%',
+        transform: 'translateX(calc(-50% + '+ xAxisShift +'px))',
+        backgroundColor: getCounterColor(tradeCount),
+        color: tradeCount > 50 ? '#000' : '#fff',
+        borderRadius: '35%',
+        width: width+'px',
+        height: height+'px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: fontSize+'px',
+        fontWeight: 'bold',
+        zIndex: '10',
+        boxShadow: '0 2px 5px rgba(0,0,0,0.3)',
+        border: tradeCount === 0 ? '1px solid #999' : 'none'
+    });
+    counters.appendChild(tradeCounter);
+
+    return counters;
 }
 
 // Запускаем расширение
