@@ -8,7 +8,7 @@ const unlockCardBorder = '6px solid #4CAF50';
 async function init() {
     // Проверяем, что мы на нужной странице
     const [isPackPage, isTradePage] = isAutoPages()
-    const [isUserCardsPage, isAnimePage, isCardsLibraryPage, isTradeOfferPage, isUserNeedPage, isUserTradePage] = isButtonPages()
+    const [isUserCardsPage, isAnimePage, isCardsLibraryPage, isTradeOfferPage, isUserNeedPage, isUserTradePage, isDeckCardsPage] = isButtonPages()
 
     // Универсальный наблюдатель для модальных окон
     const modalObserver = new MutationObserver((mutations) => {
@@ -64,7 +64,7 @@ async function init() {
                 childList: true, subtree: true
             });
         }
-    } else if (isUserCardsPage || isAnimePage || isCardsLibraryPage || isTradeOfferPage || isUserNeedPage || isUserTradePage) {
+    } else if (isUserCardsPage || isAnimePage || isCardsLibraryPage || isTradeOfferPage || isUserNeedPage || isUserTradePage || isDeckCardsPage) {
         await waitForPageLoad();
 
         const loadButton = createLoadButton();
@@ -135,7 +135,7 @@ async function processCardsAuto() {
 
 async function processCardsButton() {
     // Определяем тип страницы
-    const [isUserCardsPage, isAnimePage, isCardsLibraryPage, isTradeOfferPage, isUserNeedPage, isUserTradePage] = isButtonPages()
+    const [isUserCardsPage, isAnimePage, isCardsLibraryPage, isTradeOfferPage, isUserNeedPage, isUserTradePage, isDeckCardsPage] = isButtonPages()
     let timeout = 10
 
     // Удаляем старые счетчики перед новой загрузкой
@@ -172,11 +172,13 @@ async function processCardsButton() {
             const cards2 = document.querySelectorAll('.card-show__wrapper[href*="/cards/"]');
 
             cards = Array.from(cards1).concat(Array.from(cards2));
+        } else if (isDeckCardsPage) {
+            cards = Array.from(document.querySelectorAll('.deck__item'));
         }
         // Добавляем счетчики для каждой карты по очереди
         for (const card of cards) {
             let cardId;
-            if (isUserCardsPage || isAnimePage || isCardsLibraryPage || isUserNeedPage || isUserTradePage) {
+            if (isUserCardsPage || isAnimePage || isCardsLibraryPage || isUserNeedPage || isUserTradePage || isDeckCardsPage) {
                 cardId = card.getAttribute('data-id');
             } else if (isTradeOfferPage) {
                 cardId = card.getAttribute('data-card-id');
@@ -363,8 +365,9 @@ function isButtonPages() {
     let isTradeOfferPage = /\/cards\/\d+\/trade\/?$/.test(window.location.pathname);
     let isUserNeedPage = /\/user\/\w+\/cards\/need\/?$/.test(window.location.pathname) || /\/user\/\w+\/cards\/need\/page\/\d+\/?$/.test(window.location.pathname);
     let isUserTradePage = /\/user\/\w+\/cards\/trade\/?$/.test(window.location.pathname) || /\/user\/\w+\/cards\/trade\/page\/\d+\/?$/.test(window.location.pathname);
+    let isDeckCardsPage = /\/decks\/\d+/.test(window.location.pathname);
 
-    return [isUserCardsPage, isAnimePage, isCardsLibraryPage, isTradeOfferPage, isUserNeedPage, isUserTradePage]
+    return [isUserCardsPage, isAnimePage, isCardsLibraryPage, isTradeOfferPage, isUserNeedPage, isUserTradePage, isDeckCardsPage]
 }
 
 function isAutoPages() {
@@ -495,7 +498,7 @@ async function toggleCardLock(button, card) {
 // Функция для создания кнопки выбора карты
 function createLockButton(card) {
     const [isPackPage, isTradePage] = isAutoPages()
-    const [isUserCardsPage, isAnimePage, isCardsLibraryPage, isTradeOfferPage, isUserNeedPage, isUserTradePage] = isButtonPages()
+    const [isUserCardsPage, isAnimePage, isCardsLibraryPage, isTradeOfferPage, isUserNeedPage, isUserTradePage, isDeckCardsPage] = isButtonPages()
 
     const button = document.createElement('div');
     button.className = 'choose-card-btn';
