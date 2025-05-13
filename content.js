@@ -360,7 +360,7 @@ function sleep(ms) {
 
 function isButtonPages() {
     let isUserCardsPage = /\/user\/\w+\/cards\/?$/.test(window.location.pathname) || /\/user\/\w+\/cards\/page\/\d+\/?$/.test(window.location.pathname);
-    let isAnimePage = /\/aniserials\/video\/\w+\/\d+-/.test(window.location.pathname);
+    let isAnimePage = /\/aniserials\/videos\/\w+\/\d+-/.test(window.location.pathname);
     let isCardsLibraryPage = /\/cards\/?(\?|$)/.test(window.location.pathname) || /\/cards\/page\/\d+\/?(\?|$)/.test(window.location.pathname);
     let isTradeOfferPage = /\/cards\/\d+\/trade\/?$/.test(window.location.pathname);
     let isUserNeedPage = /\/user\/\w+\/cards\/need\/?$/.test(window.location.pathname) || /\/user\/\w+\/cards\/need\/page\/\d+\/?$/.test(window.location.pathname);
