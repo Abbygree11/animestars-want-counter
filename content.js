@@ -379,8 +379,7 @@ function isAutoPages() {
 
 // Получаем базовый URL для запросов
 function getBaseUrl() {
-    const currentOrigin = window.location.origin;
-    return currentOrigin.includes('animestars.org') ? 'https://animestars.org' : currentOrigin.includes('asstars.tv') ? 'https://asstars.tv' : 'https://astars.club';
+    return window.location.origin;
 }
 
 // Получаем количество страниц пагинации
