@@ -406,7 +406,7 @@ async function fetchCardData(cardId) {
         try {
             const baseUrl = getBaseUrl();
             // Сначала загружаем первую страницу
-            const cardPage = await fetch(`${baseUrl}/cards/${cardId}/users`);
+            const cardPage = await fetch(`${baseUrl}/cards/users/?id=${cardId}`);
             const cardPageHtml = await cardPage.text();
             const parser = new DOMParser();
             const cardPageDoc = parser.parseFromString(cardPageHtml, 'text/html');
