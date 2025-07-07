@@ -111,6 +111,8 @@ async function processCardsAuto() {
 
     // Добавляем счетчики для каждой карты по очереди
     for (const card of cards) {
+        await sleep(1000)
+
         let cardId;
         if (isPackPage) {
             cardId = card.getAttribute('data-id');
@@ -123,8 +125,11 @@ async function processCardsAuto() {
             }
         } else if (isTradePage) {
             const href = card.getAttribute('href');
-            const match = href.match(/\/cards\/(\d+)/);
+            const match = href.match(/\/cards\/users\/\?id=(\d+)/);
             cardId = match ? match[1] : null;
+
+            console.log('href - '+href)
+            console.log('cardId - '+cardId)
         }
 
         console.log('setCounter()');
@@ -177,6 +182,7 @@ async function processCardsButton() {
         }
         // Добавляем счетчики для каждой карты по очереди
         for (const card of cards) {
+            await sleep(1000)
             let cardId;
             if (isUserCardsPage || isAnimePage || isCardsLibraryPage || isUserNeedPage || isUserTradePage || isDeckCardsPage) {
                 cardId = card.getAttribute('data-id');
@@ -230,6 +236,24 @@ async function processCardNotification() {
     modal.click()
 }
 
+function sendXHR(url, formData) {
+    return new Promise(function(resolve, reject) {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', url);
+        xhr.onload = function() {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                resolve(xhr.response);
+            } else {
+                reject(new Error(xhr.statusText));
+            }
+        };
+        xhr.onerror = function() {
+            reject(new Error('Network Error'));
+        };
+        xhr.send(formData);
+    });
+}
+
 // Функция для обработки выбора карты
 async function handleCardSelection(cardElement) {
     const cardId = cardElement.getAttribute('data-id');
@@ -244,25 +268,26 @@ async function handleCardSelection(cardElement) {
     }
 
     try {
-        // 1. Выбираем карту
-        const chooseFormData = new FormData();
-        chooseFormData.append('action', 'lootbox_choose');
-        chooseFormData.append('id', cardId);
-        chooseFormData.append('pack_id', packId);
-        chooseFormData.append('user_hash', userHash);
+        // 1. Находим карту по data-id и имитируем клик по кнопке выбора
+        const cardElement = document.querySelector(`.lootbox__card[data-id="${cardId}"]`);
+        console.log('cardElement:', cardElement);
 
-        await fetch(`${baseUrl}/engine/ajax/controller.php?mod=cards_ajax`, {
-            method: 'POST', body: chooseFormData
+        if (!cardElement) {
+            console.error('Карта с указанным ID не найдена');
+            return;
+        }
+
+        // Создаем и инициируем клик
+        const clickEvent = new MouseEvent('click', {
+            bubbles: true,
+            cancelable: true,
+            view: window
         });
+        cardElement.dispatchEvent(clickEvent);
 
-        // 2. Обновляем список карт в паке
-        const loadFormData = new FormData();
-        loadFormData.append('action', 'lootbox_load');
-        loadFormData.append('user_hash', userHash);
+        await sleep(500)
 
-        await fetch(`${baseUrl}/engine/ajax/controller.php?mod=cards_ajax`, {
-            method: 'POST', body: loadFormData
-        });
+        console.log('Имитирован клик по карте ID:', cardId);
 
         // 3. Получаем ник пользователя
         const userLink = document.querySelector('.lgn__btns a[href^="/user/"]');
@@ -270,14 +295,18 @@ async function handleCardSelection(cardElement) {
 
         if (userNick) {
             // 4. Получаем страницу карт пользователя
-            const userCardsResponse = await fetch(`${baseUrl}/user/${userNick}/cards/`);
+            const userCardsResponse = await fetch(`${baseUrl}/user/cards/?name=${userNick}`);
             const userCardsHtml = await userCardsResponse.text();
             const parser = new DOMParser();
             const userCardsDoc = parser.parseFromString(userCardsHtml, 'text/html');
 
+            console.log('userCardsDoc - '+userCardsDoc)
+
             // 5. Находим карту по ID и получаем owner-id
             const userCard = userCardsDoc.querySelector(`.anime-cards__item[data-id="${cardId}"]`);
             const ownerId = userCard?.getAttribute('data-owner-id');
+
+            console.log('ownerID - '+ownerId)
 
             if (ownerId) {
                 // 6. Блокируем карту
@@ -286,14 +315,13 @@ async function handleCardSelection(cardElement) {
                 lockFormData.append('id', ownerId);
                 lockFormData.append('user_hash', userHash);
 
+                console.log('lockFormData - '+lockFormData)
+
                 await fetch(`${baseUrl}/engine/ajax/controller.php?mod=cards_ajax`, {
                     method: 'POST', body: lockFormData
                 });
             }
         }
-
-        // Обновляем страницу после всех действий
-        window.location.reload();
     } catch (error) {
         console.error('Ошибка при выборе карты:', error);
     }
@@ -363,8 +391,8 @@ function isButtonPages() {
     let isAnimePage = /\/aniserials\/videos\/\w+\/\d+-/.test(window.location.pathname);
     let isCardsLibraryPage = /\/cards\/?(\?|$)/.test(window.location.pathname) || /\/cards\/page\/\d+\/?(\?|$)/.test(window.location.pathname);
     let isTradeOfferPage = /\/cards\/\d+\/trade\/?$/.test(window.location.pathname);
-    let isUserNeedPage = /\/user\/\w+\/cards\/need\/?$/.test(window.location.pathname) || /\/user\/\w+\/cards\/need\/page\/\d+\/?$/.test(window.location.pathname);
-    let isUserTradePage = /\/user\/\w+\/cards\/trade\/?$/.test(window.location.pathname) || /\/user\/\w+\/cards\/trade\/page\/\d+\/?$/.test(window.location.pathname);
+    let isUserNeedPage = /\/user\/cards\/need\/?$/.test(window.location.pathname);
+    let isUserTradePage = /\/user\/cards\/trade\/?$/.test(window.location.pathname);
     let isDeckCardsPage = /\/decks\/\d+/.test(window.location.pathname);
 
     return [isUserCardsPage, isAnimePage, isCardsLibraryPage, isTradeOfferPage, isUserNeedPage, isUserTradePage, isDeckCardsPage]
@@ -380,24 +408,6 @@ function isAutoPages() {
 // Получаем базовый URL для запросов
 function getBaseUrl() {
     return window.location.origin;
-}
-
-// Получаем количество страниц пагинации
-function getTotalPages(doc) {
-    const pagination = doc.querySelector('.pagination__pages');
-    if (!pagination) return 1;
-
-    const pageElements = pagination.querySelectorAll('a, span');
-    let maxPage = 1;
-
-    pageElements.forEach(el => {
-        const pageNum = parseInt(el.textContent);
-        if (!isNaN(pageNum) && pageNum > maxPage) {
-            maxPage = pageNum;
-        }
-    });
-
-    return maxPage;
 }
 
 // Загружаем данные для карты с учетом пагинации
