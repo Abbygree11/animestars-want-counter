@@ -726,5 +726,10 @@ function createCountersElement(card, needCount, tradeCount) {
     return counters;
 }
 
-// Запускаем расширение
-init();
+const allowedKeywords = ['asstars', 'animestars', "astars"];
+const isMirror = allowedKeywords.some(keyword => window.location.hostname.includes(keyword));
+
+if (isMirror) {
+    // Запускаем расширение
+    init();
+}

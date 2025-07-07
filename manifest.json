@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AnimeStars Want Counter",
-  "version": "5.4",
+  "version": "6.0",
   "description": "Показывает сколько пользователей хотят получить карту",
   "icons": {
     "48": "icon.png"
@@ -9,20 +9,14 @@
   "content_scripts": [
     {
       "matches": [
-        "*://astars.club/*",
-        "*://animestars.org/*",
-        "*://asstars.tv/*",
-        "*://asstars.club/*"
+        "*://*/*"
       ],
       "js": ["content.js"]
     }
   ],
   "permissions": ["storage"],
   "host_permissions": [
-    "*://astars.club/*",
-    "*://animestars.org/*",
-    "*://asstars.tv/*",
-    "*://asstars.club/*"
+    "*://*/*"
   ],
   "web_accessible_resources": [{
     "resources": ["icon.png", "lock.png"],
