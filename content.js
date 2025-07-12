@@ -53,10 +53,16 @@ async function init() {
             // Для динамически подгружаемых карт
             new MutationObserver((mutations) => {
                 // Игнорируем изменения, если они содержат только счетчики
-                const hasNonCounterChanges = mutations.some(mutation => {
-                    return !mutation.addedNodes || Array.from(mutation.addedNodes).some(node => !node.classList?.contains('card-counters'));
+                const hasCounterChanges = mutations.some(mutation => {
+                    const hasNotAddedNodes = !mutation.addedNodes
+                    if (hasNotAddedNodes) {
+                        return true
+                    }
+                    const isCardCounter = Array.from(mutation.addedNodes).some(node => node.classList?.contains('card-counters'))
+                    const isChooseCardBtn = Array.from(mutation.addedNodes).some(node => node.classList?.contains('choose-card-btn'))
+                    return isCardCounter || isChooseCardBtn;
                 });
-                if (hasNonCounterChanges) {
+                if (!hasCounterChanges) {
                     console.log('processCardsAuto()');
                     processCardsAuto();
                 }
@@ -128,8 +134,8 @@ async function processCardsAuto() {
             const match = href.match(/\/cards\/users\/\?id=(\d+)/);
             cardId = match ? match[1] : null;
 
-            console.log('href - '+href)
-            console.log('cardId - '+cardId)
+            console.log('href - ' + href)
+            console.log('cardId - ' + cardId)
         }
 
         console.log('setCounter()');
@@ -237,17 +243,17 @@ async function processCardNotification() {
 }
 
 function sendXHR(url, formData) {
-    return new Promise(function(resolve, reject) {
+    return new Promise(function (resolve, reject) {
         const xhr = new XMLHttpRequest();
         xhr.open('POST', url);
-        xhr.onload = function() {
+        xhr.onload = function () {
             if (xhr.status >= 200 && xhr.status < 300) {
                 resolve(xhr.response);
             } else {
                 reject(new Error(xhr.statusText));
             }
         };
-        xhr.onerror = function() {
+        xhr.onerror = function () {
             reject(new Error('Network Error'));
         };
         xhr.send(formData);
@@ -300,13 +306,13 @@ async function handleCardSelection(cardElement) {
             const parser = new DOMParser();
             const userCardsDoc = parser.parseFromString(userCardsHtml, 'text/html');
 
-            console.log('userCardsDoc - '+userCardsDoc)
+            console.log('userCardsDoc - ' + userCardsDoc)
 
             // 5. Находим карту по ID и получаем owner-id
             const userCard = userCardsDoc.querySelector(`.anime-cards__item[data-id="${cardId}"]`);
             const ownerId = userCard?.getAttribute('data-owner-id');
 
-            console.log('ownerID - '+ownerId)
+            console.log('ownerID - ' + ownerId)
 
             if (ownerId) {
                 // 6. Блокируем карту
@@ -315,7 +321,7 @@ async function handleCardSelection(cardElement) {
                 lockFormData.append('id', ownerId);
                 lockFormData.append('user_hash', userHash);
 
-                console.log('lockFormData - '+lockFormData)
+                console.log('lockFormData - ' + lockFormData)
 
                 await fetch(`${baseUrl}/engine/ajax/controller.php?mod=cards_ajax`, {
                     method: 'POST', body: lockFormData
@@ -387,7 +393,7 @@ function sleep(ms) {
 }
 
 function isButtonPages() {
-    let isUserCardsPage = /\/user\/\w+\/cards\/?$/.test(window.location.pathname) || /\/user\/\w+\/cards\/page\/\d+\/?$/.test(window.location.pathname);
+    let isUserCardsPage = /\/user\/cards\/?$/.test(window.location.pathname);
     let isAnimePage = /\/aniserials\/videos\/\w+\/\d+-/.test(window.location.pathname);
     let isCardsLibraryPage = /\/cards\/?(\?|$)/.test(window.location.pathname) || /\/cards\/page\/\d+\/?(\?|$)/.test(window.location.pathname);
     let isTradeOfferPage = /\/cards\/\d+\/trade\/?$/.test(window.location.pathname);
@@ -513,17 +519,17 @@ function createLockButton(card) {
     button.className = 'choose-card-btn';
     button.title = 'Выбрать эту карту';
 
-    const width = card.offsetWidth * (35/160);  //example - 160*(35/160)= 35
-    const diameter = width * (25/35);           //example - 35*(25/35)  = 25
-    const topShift = width * (10/35);           //example - 35*(10/35)  = 10
-    const rightShift = width * (10/35);         //example - 35*(10/35)  = 10
+    const width = card.offsetWidth * (35 / 160);  //example - 160*(35/160)= 35
+    const diameter = width * (25 / 35);           //example - 35*(25/35)  = 25
+    const topShift = width * (10 / 35);           //example - 35*(10/35)  = 10
+    const rightShift = width * (10 / 35);         //example - 35*(10/35)  = 10
 
     Object.assign(button.style, {
         position: 'absolute',
-        top: topShift+'px',
-        right: rightShift+'px',
-        width: diameter+'px',
-        height: diameter+'px',
+        top: topShift + 'px',
+        right: rightShift + 'px',
+        width: diameter + 'px',
+        height: diameter + 'px',
         backgroundColor: '#772ce8',
         borderRadius: '50%',
         cursor: 'pointer',
@@ -662,11 +668,11 @@ function getCounterColor(count) {
 
 // Создаем счетчик
 function createCountersElement(card, needCount, tradeCount) {
-    const width = card.offsetWidth * (35/160)   //example - 160*(35/160)= 35
-    const height = width * (25/35)              //example - 35*(25/35)  = 25
-    const fontSize = width * (12/35)            //example - 35*(12/35)  = 12
+    const width = card.offsetWidth * (35 / 160)   //example - 160*(35/160)= 35
+    const height = width * (25 / 35)              //example - 35*(25/35)  = 25
+    const fontSize = width * (12 / 35)            //example - 35*(12/35)  = 12
     const xAxisShift = (width / 2) + 1          //example - 35/2 + 1    = 21
-    const topShift = width * (10/35);           //example - 35*(10/35)  = 10
+    const topShift = width * (10 / 35);           //example - 35*(10/35)  = 10
 
     const counters = document.createElement('div');
     counters.className = 'card-counters';
@@ -678,18 +684,18 @@ function createCountersElement(card, needCount, tradeCount) {
 
     Object.assign(needCounter.style, {
         position: 'absolute',
-        top: topShift+'px',
+        top: topShift + 'px',
         left: '50%',
-        transform: 'translateX(calc(-50% - '+ xAxisShift +'px))',
+        transform: 'translateX(calc(-50% - ' + xAxisShift + 'px))',
         backgroundColor: getCounterColor(needCount),
         color: needCount > 50 ? '#000' : '#fff',
         borderRadius: '35%',
-        width: width+'px',
-        height: height+'px',
+        width: width + 'px',
+        height: height + 'px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontSize: fontSize+'px',
+        fontSize: fontSize + 'px',
         fontWeight: 'bold',
         zIndex: '10',
         boxShadow: '0 2px 5px rgba(0,0,0,0.3)',
@@ -704,18 +710,18 @@ function createCountersElement(card, needCount, tradeCount) {
 
     Object.assign(tradeCounter.style, {
         position: 'absolute',
-        top: topShift+'px',
+        top: topShift + 'px',
         left: '50%',
-        transform: 'translateX(calc(-50% + '+ xAxisShift +'px))',
+        transform: 'translateX(calc(-50% + ' + xAxisShift + 'px))',
         backgroundColor: getCounterColor(tradeCount),
         color: tradeCount > 50 ? '#000' : '#fff',
         borderRadius: '35%',
-        width: width+'px',
-        height: height+'px',
+        width: width + 'px',
+        height: height + 'px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontSize: fontSize+'px',
+        fontSize: fontSize + 'px',
         fontWeight: 'bold',
         zIndex: '10',
         boxShadow: '0 2px 5px rgba(0,0,0,0.3)',
