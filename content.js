@@ -394,7 +394,7 @@ function sleep(ms) {
 
 function isButtonPages() {
     let isUserCardsPage = /\/user\/cards\/?$/.test(window.location.pathname);
-    let isAnimePage = /\/aniserials\/videos\/\w+\/\d+-/.test(window.location.pathname);
+    let isAnimePage = /\/aniserials\/video\/\w+\/\d+-/.test(window.location.pathname);
     let isCardsLibraryPage = /\/cards\/?(\?|$)/.test(window.location.pathname) || /\/cards\/page\/\d+\/?(\?|$)/.test(window.location.pathname);
     let isTradeOfferPage = /\/cards\/\d+\/trade\/?$/.test(window.location.pathname);
     let isUserNeedPage = /\/user\/cards\/need\/?$/.test(window.location.pathname);
